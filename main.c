@@ -5,13 +5,23 @@
 
  Author: Stanislav Petr <glux@glux.org>
 
+          |----o----|
+     +5V -|         |- GND
+          |         |
+   Start -|GP5   GP0|- GP0
+          |         |
+   Volt. -|AN3   GP1|- GP1
+          |         |
+         -|GP3   GP2|- PWM OUT
+          |---------|
+
 */
 
 #include <htc.h>
 #define _XTAL_FREQ   4000000    
 __CONFIG(FOSC_INTRCIO & WDTE_OFF & PWRTE_ON & MCLRE_OFF & BOREN_ON & CP_OFF & CPD_OFF);
 
-unsigned char INTCYCLE = 0;
+unsigned char PWMCycle = 0;
 
 void InitPWM(void) {
   // Timer0 Registers
@@ -24,7 +34,7 @@ void InitPWM(void) {
   PS2 = 0;   // bits 2-0  PS2:PS0: Prescaler Rate Select bits
   PS1 = 0;
   PS0 = 0;
-  TMR0 = 156; // preset for timer register
+  TMR0 = 0xE7; // preset for timer register (156)
 
   // Interrupt Registers
   INTCON = 0; // Clear the interrpt control register
@@ -35,47 +45,28 @@ void InitPWM(void) {
 
 void interrupt ISR(void) {
   if(T0IF) { // If Timer0 interrupt
-    TMR0 = 156; // preset for next interrupt run
-    INTCYCLE++;
-    switch (INTCYCLE) {
-      case 1:
-        GPIO = 0b00000001;
-        break;
-      case 2:
-        GPIO = 0b00000010;
-        break;
-      case 3:
-        GPIO = 0b00000100;
-        break;
-      case 4:
-        GPIO = 0b00001000;
-        break;
-      case 5:
-        GPIO = 0b00010000;
-        break;
-      case 6:
-        GPIO = 0b00100000;
-        break;
-      case 7:
-      case 8:
-      case 9:
-        GPIO = 0b00000000;
-        break;
-      default:
-        INTCYCLE=0;
+    PWMCycle++;
+    if(PWMCycle==10 && GP5==0) {
+      GP2 = 1;
+      PWMCycle=0;
+    } else {
+      GP2 = 0;
     }
+    TMR0 = 0xE7; // preset for next interrupt run
     T0IF = 0; // Clear the interrupt
   }
 }
 
 void main() {
-  ANSEL = 0x00; // Set ports as digital I/O, not analog input
-  ADCON0 = 0x00; // Shut off the A/D Converter
+  OPTION_REG = 0b00000000;
+  TRISIO = 0b00111011; // GP2 is output, all others are input
+//  ANSEL = 0b00011000; // Set port AN3 as analog I/O, TAD = 2uS (@4MHz clock)
+//  ADCON0 = 0b00000000; // Turn on the A/D Converter for AN3
   CMCON = 0x07; // Shut off the Comparator
   VRCON = 0x00; // Shut off the Voltage Reference
-  TRISIO = 0b00000000; // All GPIO are output
-  GPIO = 0x00; // Make all pins 0
-
+  GPIO = 0b00000000; // Make all pins 0
+  WPU = 0b00100000; // Enable pull up on GP5
+  IOCB = 0;
   InitPWM(); // Initialize PWM
 
   while (1) {
