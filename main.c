@@ -18,10 +18,22 @@
 */
 
 #include <htc.h>
+#include <xc.h>
+#include <pic.h>
+#include <pic12f675.h>
+
 #define _XTAL_FREQ   4000000    
-__CONFIG(FOSC_INTRCIO & WDTE_OFF & PWRTE_ON & MCLRE_OFF & BOREN_ON & CP_OFF & CPD_OFF);
+
+#pragma config WDTE = OFF
+#pragma config PWRTE = ON
+#pragma config MCLRE = OFF
+#pragma config BOREN = ON
+#pragma config CP = ON
+#pragma config CPD = ON
+#pragma config FOSC = INTRCIO 
 
 unsigned char PWMCycle = 0;
+unsigned char Voltage = 0;
 
 void InitPWM(void) {
   // Timer0 Registers
@@ -46,7 +58,7 @@ void InitPWM(void) {
 void interrupt ISR(void) {
   if(T0IF) { // If Timer0 interrupt
     PWMCycle++;
-    if(PWMCycle==10 && GP5==0) {
+    if(PWMCycle==10 && GP5==1 && Voltage>50) {
       GP2 = 1;
       PWMCycle=0;
     } else {
@@ -60,15 +72,20 @@ void interrupt ISR(void) {
 void main() {
   OPTION_REG = 0b00000000;
   TRISIO = 0b00111011; // GP2 is output, all others are input
-//  ANSEL = 0b00011000; // Set port AN3 as analog I/O, TAD = 2uS (@4MHz clock)
-//  ADCON0 = 0b00000000; // Turn on the A/D Converter for AN3
   CMCON = 0x07; // Shut off the Comparator
   VRCON = 0x00; // Shut off the Voltage Reference
   GPIO = 0b00000000; // Make all pins 0
   WPU = 0b00100000; // Enable pull up on GP5
   IOCB = 0;
+  VCFG=0; // +Vref = Vdd
   InitPWM(); // Initialize PWM
 
   while (1) {
+    ADCON0=0x00;
+    ADCON0=(3<<2);
+    ADON=1;
+    GO_DONE=1;
+    while(GO_DONE);
+    Voltage=ADRESH;
   }
 }
