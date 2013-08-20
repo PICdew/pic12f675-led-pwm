@@ -1,0 +1,7 @@
+_ConfigureOscillator: CODE, 171 0 1
+_main: CODE, 148 0 19
+_InitApp: CODE, 120 0 28
+__initialization: CODE, 167 0 2
+_isr: CODE, 84 0 36
+_ADC_Read: CODE, 20 0 64
+Total: 150
